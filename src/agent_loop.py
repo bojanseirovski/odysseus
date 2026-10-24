@@ -2841,8 +2841,20 @@ def _parse_qwen_explicit_admin_request(text: str) -> Optional[tuple[str, str]]:
         return "manage_tokens", json.dumps({"action": "list"})
     if listish and re.search(r"\bwebhooks?\b", q):
         return "manage_webhooks", json.dumps({"action": "list"})
-    if listish and re.search(r"\bmcp(?:\s+servers?)?\b", q):
-        return "manage_mcp", json.dumps({"action": "list"})
+    if (
+        listish
+        # "use the mcp" asks to call an MCP tool, not to inspect the registry.
+        and not re.search(r"\b(?:use|using|via|through|call|run|ask|query)\b[^.!?;]{0,30}\bmcp\b", q)
+        and re.search(
+            r"\bmcp\s+(?:servers?|tools?|connections?|integrations?)\b"
+            r"|\b(?:my|configured|connected|installed|available)\s+mcp\b",
+            q,
+        )
+    ):
+        # Match required_read_operation_for_request: an MCP *tools* question
+        # is authorized only as list_tools, so emitting list here is denied.
+        action = "list_tools" if re.search(r"\btools?\b", q) else "list"
+        return "manage_mcp", json.dumps({"action": action})
     return None
 
 
